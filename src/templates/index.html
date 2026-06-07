@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>16GB宇宙 - ノイマンの箱庭</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.3.2/pixi.min.js"></script>
+    <style>
+        body { margin: 0; background-color: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh;}
+        #stats { position: absolute; top: 10px; left: 10px; color: #0f0; font-family: monospace; font-size: 16px; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 5px; z-index: 10;}
+    </style>
+</head>
+<body>
+    <div id="stats">📡 宇宙からの信号を待機中...</div>
+
+    <script>
+        const app = new PIXI.Application({ width: 800, height: 800, backgroundColor: 0x111111 });
+        document.body.appendChild(app.view);
+
+        const SCALE = 8.0;
+        const GRID_SIZE = 50;
+        const TILE_SIZE = (100 / GRID_SIZE) * SCALE; // 1マスの画面上のサイズ
+
+        const createDot = (color, size) => {
+            const g = new PIXI.Graphics();
+            g.beginFill(color);
+            g.drawRect(0, 0, size, size);
+            return app.renderer.generateTexture(g);
+        };
+        const texTaro = createDot(0xFFFFFF, 3);
+        const texMeat = createDot(0x8B0000, 4);
+
+        // ------------------------------------------
+        // 🌏 地形タイル（Perlin Noiseの高度データで着色）
+        // ------------------------------------------
+        const terrainContainer = new PIXI.Container();
+        const terrainSprites = [];
+        const texTerrain = createDot(0xFFFFFF, TILE_SIZE);
+
+        for (let y = 0; y < GRID_SIZE; y++) {
+            for (let x = 0; x < GRID_SIZE; x++) {
+                let s = new PIXI.Sprite(texTerrain);
+                s.x = x * TILE_SIZE;
+                s.y = y * TILE_SIZE;
+                s.tint = 0x222222; // 地形データ受信前は暗い色
+                s.alpha = 1.0;
+                terrainContainer.addChild(s);
+                terrainSprites.push(s);
+            }
+        }
+
+        // 🌿 植物タイル（地形の上にオーバーレイ表示）
+        const plantContainer = new PIXI.Container();
+        const plantSprites = [];
+        const texPlant = createDot(0x00FF00, TILE_SIZE);
+        
+        for (let y = 0; y < GRID_SIZE; y++) {
+            for (let x = 0; x < GRID_SIZE; x++) {
+                let s = new PIXI.Sprite(texPlant);
+                s.x = x * TILE_SIZE;
+                s.y = y * TILE_SIZE;
+                s.alpha = 0.0; // 最初は透明（草が生えてない）
+                plantContainer.addChild(s);
+                plantSprites.push(s);
+            }
+        }
+
+        const meatContainer = new PIXI.ParticleContainer(10000, { position: true });
+        const taroContainer = new PIXI.ParticleContainer(30000, { position: true, tint: true, scale: true });
+
+        // 描画レイヤーの重なり順（下から上へ）
+        // 地形 → 植物 → 死肉 → 生物
+        app.stage.addChild(terrainContainer);
+        app.stage.addChild(plantContainer);
+        app.stage.addChild(meatContainer);
+        app.stage.addChild(taroContainer);
+
+        const taroSprites = []; const meatSprites = [];
+        for(let i=0; i<30000; i++) { let s = new PIXI.Sprite(texTaro); s.visible = false; taroContainer.addChild(s); taroSprites.push(s); }
+        for(let i=0; i<10000; i++) { let s = new PIXI.Sprite(texMeat); s.visible = false; meatContainer.addChild(s); meatSprites.push(s); }
+
+        const socket = io();
+        const stats = document.getElementById('stats');
+        let taroCount = 0; let totalPlantMass = 0; let meatCount = 0;
+
+        // ------------------------------------------
+        // 🎨 地形カラーリング関数
+        // ------------------------------------------
+        
+        /**
+         * 2つの色を混ぜる（線形補間）
+         * 
+         * 【なぜ必要？】
+         * 地形の色は「緑→茶→灰」のように連続的に変化させたい。
+         * 2色の間を滑らかに繋ぐために、RGB各成分を個別に補間する。
+         * 
+         * t=0.0 → c1の色、t=1.0 → c2の色、t=0.5 → 中間色
+         */
+        function lerpColor(c1, c2, t) {
+            t = Math.max(0, Math.min(1, t));
+            const r1 = (c1 >> 16) & 0xFF, g1 = (c1 >> 8) & 0xFF, b1 = c1 & 0xFF;
+            const r2 = (c2 >> 16) & 0xFF, g2 = (c2 >> 8) & 0xFF, b2 = c2 & 0xFF;
+            const r = Math.floor(r1 + (r2 - r1) * t);
+            const g = Math.floor(g1 + (g2 - g1) * t);
+            const b = Math.floor(b1 + (b2 - b1) * t);
+            return (r << 16) | (g << 8) | b;
+        }
+
+        /**
+         * 高度・川・水分から地形の色を決定する
+         * 
+         * 【カラーパレット】
+         * - 川      : 深い青（深さに応じて暗くなる）
+         * - 低地+湿潤: 森の緑（ジャングル）
+         * - 低地+乾燥: 砂の黄土色（砂漠）
+         * - 高地    : 岩の灰色
+         * - 山頂    : 雪の白色
+         */
+        function getTerrainColor(alt, river, moist) {
+            // 🌊 川: 深さに応じた青
+            if (river > 0.1) {
+                return lerpColor(0x4A90D9, 0x1a3a5c, river);
+            }
+            
+            // 🌿 陸地の基本色: 水分で「緑（湿潤）←→ 砂色（乾燥）」をブレンド
+            const greenColor = 0x2D5A1E;  // 深い森の緑
+            const sandColor  = 0xC4A35A;  // 砂漠の黄土色
+            const rockColor  = 0x8B8B83;  // 岩の灰色
+            const snowColor  = 0xCDCDCD;  // 雪の白灰色
+            
+            let baseColor = lerpColor(sandColor, greenColor, moist);
+            
+            // 🏔️ 高度で「基本色→岩色→雪色」にブレンド
+            if (alt > 0.6) {
+                const t = (alt - 0.6) / 0.25;
+                baseColor = lerpColor(baseColor, rockColor, Math.min(1, t));
+            }
+            if (alt > 0.85) {
+                const t = (alt - 0.85) / 0.15;
+                baseColor = lerpColor(baseColor, snowColor, Math.min(1, t));
+            }
+            
+            return baseColor;
+        }
+
+        // ------------------------------------------
+        // 📡 データ受信ハンドラ
+        // ------------------------------------------
+
+        // 🌏 地形データの受信（接続時に1回だけ届く）
+        socket.on('terrain_data', (buffer) => {
+            const data = new Float32Array(buffer);
+            for (let i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
+                const altitude = data[i * 3];
+                const riverDepth = data[i * 3 + 1];
+                const moisture = data[i * 3 + 2];
+                terrainSprites[i].tint = getTerrainColor(altitude, riverDepth, moisture);
+            }
+            console.log('🌏 地形データ受信完了');
+        });
+
+        // 🧬 太郎データの受信（8要素・リアルタイム体色対応版）
+        socket.on('taro_data', (buffer) => {
+            const data = new Float32Array(buffer);
+            taroCount = data.length / 8;
+            
+            for(let i=0; i<30000; i++) {
+                if (i < taroCount) {
+                    const idx = i * 8;
+                    taroSprites[i].x = data[idx + 0] * SCALE;
+                    taroSprites[i].y = data[idx + 1] * SCALE;
+                    
+                    const size = data[idx + 3];
+                    const r = data[idx + 5];
+                    const g = data[idx + 6];
+                    const b = data[idx + 7];
+                    
+                    let r_val = Math.min(255, Math.floor(r * 255));
+                    let g_val = Math.min(255, Math.floor(g * 255));
+                    let b_val = Math.min(255, Math.floor(b * 255));
+                    taroSprites[i].tint = (r_val << 16) + (g_val << 8) + b_val;
+                    
+                    taroSprites[i].scale.set(size * 0.8);
+                    taroSprites[i].visible = true;
+                } else { 
+                    taroSprites[i].visible = false; 
+                }
+            }
+            updateStats();
+        });
+
+        // 🌿 植物データの受信（濃度マップ）
+        socket.on('plant_data', (buffer) => {
+            const densities = new Float32Array(buffer);
+            totalPlantMass = 0;
+            
+            const totalGrids = GRID_SIZE * GRID_SIZE;
+            for (let i = 0; i < totalGrids; i++) {
+                const treeAmount = densities[i * 2];
+                const grassAmount = densities[i * 2 + 1];
+                const totalDensity = treeAmount + grassAmount;
+                totalPlantMass += totalDensity;
+                plantSprites[i].alpha = Math.min(0.6, totalDensity / 1000.0);
+            }
+            updateStats();
+        });
+
+        // 🍖 肉データの受信
+        socket.on('meat_data', (buffer) => {
+            const coords = new Float32Array(buffer);
+            meatCount = coords.length / 2;
+            for(let i=0; i<10000; i++) {
+                if (i < meatCount) {
+                    meatSprites[i].x = coords[i * 2] * SCALE;
+                    meatSprites[i].y = coords[i * 2 + 1] * SCALE;
+                    meatSprites[i].visible = true;
+                } else { meatSprites[i].visible = false; }
+            }
+            updateStats();
+        });
+
+        function updateStats() {
+            stats.innerHTML = `🌍 太郎: ${taroCount}匹 | 🌿 草の総量: ${Math.floor(totalPlantMass)} | 🍖 死肉: ${meatCount}個`;
+        }
+    </script>
+</body>
+</html>
