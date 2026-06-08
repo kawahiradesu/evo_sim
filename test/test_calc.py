@@ -1,6 +1,7 @@
 from pytest import approx
-from src.calc import calc_mass
+from src.calc import calc_mass, calc_grass_efficiency
 
+"""calc_massのテスト"""
 #To Do:approxについて調べる(済み)
 def test_calc_mass_baseline():
     expect = 1.55
@@ -17,3 +18,17 @@ def test_comparison_skin():
 
 def test_base():
     assert 1.0 <= calc_mass(1, 0.1, 0.15, 0.5, 0.15, 0.3) <= 1.5
+
+"""calc_grass_efficiencyのテスト"""
+
+def test_fungs_effect():
+    assert calc_grass_efficiency(0.5,0.5,0.5,0.1) >= calc_grass_efficiency(0.5,0.5,0.5,0.9)
+
+def test_organ_effect():
+    assert calc_grass_efficiency(0.8,0.5,0.5,0.5) >= calc_grass_efficiency(0.1,0.5,0.5,0.5)
+    assert calc_grass_efficiency(0.5,0.8,0.5,0.5) >= calc_grass_efficiency(0.5,0.1,0.5,0.5)
+    assert calc_grass_efficiency(0.5,0.5,0.8,0.5) >= calc_grass_efficiency(0.5,0.5,0.1,0.5)
+
+def test_lowest_value():
+    assert calc_grass_efficiency(0.0,0.0,0.0,0.0) >= 0.0
+    assert calc_grass_efficiency(0.0,0.0,0.0,0.9) >= 0.0
