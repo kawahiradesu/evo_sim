@@ -202,7 +202,7 @@ def process_bugs(taro_x, taro_y, taro_alive, t_energies, t_true_stomach_aciditie
                 
                 # 🌟 NEW: 虫の殻を砕くには「0.5 (頑丈な円錐)」が最強！
                 # 0.5のとき1.0(最高)。0.0(平ら)や1.0(ナイフ)だと 0.25(最低) になる山なり曲線
-                bug_tooth_score = max(0.1, 1.0 - abs(t_fangs[i] - 0.5) * 1.5)
+                bug_tooth_score = calc_bug_tooth_score(t_fangs[i])
                 
                 # 胃酸と「殻砕き歯」の掛け合わせで昆虫食適正が決まる
                 carni_score = t_true_stomach_acidities[i] * bug_tooth_score
@@ -577,15 +577,10 @@ def process_interactions(taro_x, taro_y, taro_alive, t_energies, t_fangs, t_size
         actual_cecum = min(t_cecum_sizes[i], t_sizes[i] * 0.5)
 
         # 🌿 草の消化効率
-        grass_organ_score = (actual_forestomach + actual_cecum + t_intestine_lens[i]) / 3.0
-        # 🌟 FIX: 草のペナルティを線形に（0.0で100%効率、0.5で50%効率、1.0でほぼ0%）
-        grass_penalty = max(0.01, 1.0 - t_fangs[i]) 
-        grass_efficiency = grass_organ_score * grass_penalty
+        grass_efficiency = calc_grass_efficiency(actual_forestomach, actual_cecum, t_intestine_lens[i], t_fangs[i])
         
         # 🍖 肉の消化効率
-        meat_organ_score = t_true_stomach_acidities[i] * (1.1 - t_intestine_lens[i]) * (1.1 - actual_forestomach)
-        # 🌟 そのまま: 肉のボーナスは二次曲線（0.5では25%効率で鈍いが、1.0で100%効率のナイフになる）
-        meat_efficiency = meat_organ_score * max(0.01, t_fangs[i] ** 2) * (3.0 + (t_fangs[i] * 3.0))
+        meat_efficiency  = calc_meat_efficiency(t_true_stomach_acidities[i], t_intestine_lens[i], actual_forestomach, t_fangs[i])
 
         for dx in range(-1, 2):
             if acted: break
@@ -598,8 +593,19 @@ def process_interactions(taro_x, taro_y, taro_alive, t_energies, t_fangs, t_size
                     for c in range(t_counts[nx, ny]):
                         j = t_idx[nx, ny, c]
                         if i != j and taro_alive[j] and taro_alive[i] and (taro_x[j] - tx)**2 + (taro_y[j] - ty)**2 < interact_dist_sq:
-                            D = get_genetic_distance(i, j, t_fangs, t_sizes, t_speeds, t_aggros, t_intels, t_true_stomach_acidities, t_forestomach_capas, t_intestine_lens, t_cecum_sizes)
-                            M = get_morpho_distance(i, j, t_fangs, t_sizes, t_intestine_lens, t_true_stomach_acidities)
+                            D = calc_genetic_distance(
+                                t_fangs[i], t_fangs[j], t_sizes[i], t_sizes[j],
+                                t_speeds[i], t_speeds[j], t_aggros[i], t_aggros[j],
+                                t_intels[i], t_intels[j], t_true_stomach_acidities[i], t_true_stomach_acidities[j],
+                                t_forestomach_capas[i], t_forestomach_capas[j],
+                                t_intestine_lens[i], t_intestine_lens[j],
+                                t_cecum_sizes[i], t_cecum_sizes[j]
+                            )
+                            M = calc_morpho_distance(
+                                t_fangs[i], t_fangs[j], t_sizes[i], t_sizes[j],
+                                t_intestine_lens[i], t_intestine_lens[j],
+                                t_true_stomach_acidities[i], t_true_stomach_acidities[j]
+                            )
                             
                             # 繁殖: 全遺伝子距離が近ければOK
                             if D < 0.4:
@@ -617,10 +623,10 @@ def process_interactions(taro_x, taro_y, taro_alive, t_energies, t_fangs, t_size
                             eat_amount = min(grass_grids[ny, nx], 20.0)
                             grass_grids[ny, nx] -= eat_amount
                             
-                            acid_penalty = (1.0 - t_true_stomach_acidities[i]) ** 3
-                            base_digestion = eat_amount * grass_efficiency * acid_penalty
-                            fermentation_bonus = eat_amount * t_microbiome[i] * 1.5
-                            t_energies[i] += (base_digestion + fermentation_bonus)
+                            acid_penalty       = calc_acid_penalty(t_true_stomach_acidities[i])
+                            base_digestion     = eat_amount * grass_efficiency * acid_penalty
+                            fermentation_bonus = calc_fermentation_bonus(eat_amount, t_microbiome[i], actual_forestomach, actual_cecum)
+                            t_energies[i] += (base_digestion + fermentation_bonus)  
                             
                             # 🦠 生物学的根拠: 胃酸が強いと摂取した植物由来の草食菌が胃で殺菌される。
                             # 草食寄り個体(低胃酸)ほど細菌が定着しやすく、肉食個体はほぼ定着しない。
