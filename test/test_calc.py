@@ -1,5 +1,5 @@
 from pytest import approx
-from src.calc import calc_mass, calc_grass_efficiency,calc_fermentation_bonus,calc_cold_resistance,calc_armor_value
+from src.calc import calc_mass, calc_grass_efficiency,calc_fermentation_bonus,calc_cold_resistance,calc_armor_value,calc_genetic_distance,calc_morpho_distance
 
 """calc_massのテスト"""
 #To Do:approxについて調べる(済み)
@@ -64,3 +64,37 @@ def test_armor_size():
 
 def test_armor_complexity():
     assert calc_armor_value(0.5,1.0,0.0,0.5) >= calc_armor_value(0.5,1.0,0.9,0.5)
+
+"""calc_genetic_distance() と calc_morpho_distance()のテスト"""
+def test_same_gen():
+    assert calc_genetic_distance(
+    0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+    0.5, 0.5, 0.5, 0.5, 0.5, 0.5
+) == 0.0
+    
+def test_difference_gen():
+    assert calc_genetic_distance(
+    0.9, 0.1, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+    0.5, 0.5, 0.5, 0.5, 0.5, 0.5
+) != 0.0
+    
+def test_over_zero_gen():
+    assert calc_genetic_distance(
+    0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
+    0.5, 0.5, 0.5, 0.5, 0.5, 0.5
+) >= 0.0
+    
+def test_same_morpho():
+    assert  calc_morpho_distance(
+    0.5, 0.5, 0.5, 0.5,
+    0.5, 0.5, 0.5, 0.5
+) == 0.0
+
+def test_comparison_gem_and_morpho():
+    assert calc_genetic_distance(
+    0.5, 0.5, 1.0, 1.0, 0.5, 0.5, 0.0, 1.0, 0.0, 1.0, 0.5, 0.5,
+    0.5, 0.5, 0.5, 0.5, 0.5, 0.5
+) >= calc_morpho_distance(
+    0.5, 0.5, 1.0, 1.0,
+    0.5, 0.5, 0.5, 0.5
+)
