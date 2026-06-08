@@ -5,7 +5,7 @@ import numpy as np
 # random モジュールは np.random に統一（Numba最適化のため）
 from numba import njit
 from config import *
-
+from calc import *
 # ------------------------------------------
 # 🌿 1. 環境システム（植物とグリッド）
 # ------------------------------------------
@@ -98,14 +98,15 @@ def has_river_crossing(src_x, src_y, target_x, river_grids):
 # 🏃‍♂️ 2. 運動・スタミナ・物理システム
 # ------------------------------------------
 @njit
-def update_movement_and_stamina(taro_x, taro_y, taro_alive, t_angles, t_speeds, t_current_speeds, t_sizes, t_staminas, t_max_staminas, t_lung_capas, t_muscle_ratio, t_energies, river_grids, t_fat_ratios, t_keratins, t_keratin_types, t_keratin_complexities, altitude_grids, global_temperature):
+def update_movement_and_stamina(taro_x, taro_y, taro_alive, t_angles, t_speeds, t_current_speeds, t_sizes, t_staminas, t_max_staminas, t_lung_capas, t_muscle_ratio, t_energies, river_grids, t_fat_ratios, t_keratins, t_keratin_types, t_keratin_complexities, altitude_grids, global_temperature,t_intestine_lens):
     for i in range(len(taro_alive)):
         if not taro_alive[i]: continue
 
         # ⚖️ 体重ペナルティ（脂肪と鱗は重い）
         # 脂肪 + 鱗(βケラチンで単純な構造)
-        scale_factor = t_keratin_types[i] * (1.0 - t_keratin_complexities[i])
-        weight_penalty = (t_fat_ratios[i] * 0.5) + (t_keratins[i] * scale_factor * 0.5)
+        mass = calc_mass(t_sizes[i], t_fat_ratios[i], t_keratins[i], t_keratin_types[i], t_keratin_complexities[i], t_intestine_lens[i])
+        base_mass = t_sizes[i] ** 3
+        weight_penalty = calc_weight_penalty(mass, base_mass)
         base_speed = t_speeds[i] / max(1.0, (1.0 + weight_penalty))
 
         # 筋肉タイプによる限界速度の決定（白筋ほど爆発力が高い）
@@ -123,11 +124,7 @@ def update_movement_and_stamina(taro_x, taro_y, taro_alive, t_angles, t_speeds, 
 
         if local_temp < 10.0:
             # 寒冷耐性の計算: 脂肪 + 獣毛(αケラチン×単純) または ダウン(βケラチン×複雑)
-            alpha_fur_factor = (1.0 - t_keratin_types[i]) * (1.0 - t_keratin_complexities[i])
-            beta_down_factor = t_keratin_types[i] * t_keratin_complexities[i]
-            insulation = t_keratins[i] * max(alpha_fur_factor, beta_down_factor)
-            
-            cold_resistance = (t_fat_ratios[i] * 0.5) + (insulation * 0.5)
+            cold_resistance = calc_cold_resistance(t_fat_ratios[i], t_keratins[i], t_keratin_types[i], t_keratin_complexities[i])
             # 10度を下回った分だけ、耐性がないとダメージを受ける
             damage = (10.0 - local_temp) * (1.0 - cold_resistance) * 0.1 # 1フレームあたりのダメージ
             t_energies[i] -= damage
@@ -515,9 +512,8 @@ def attempt_combat(i, j, is_same_species, meat_efficiency, taro_alive, taro_x, t
     fatigue_ratio_j = max(0.0, (t_staminas[j] / (t_max_staminas[j] + 0.001)) - 0.5) * 2.0
 
     # 🛡️ 防御側(j)の物理防御力を計算: βケラチン × 単純構造(鱗)
-    scale_factor_j = t_keratin_types[j] * (1.0 - t_keratin_complexities[j])
-    armor_value_j = (t_keratins[j] * scale_factor_j) * (t_sizes[j] / 3.0)
-    damage_multiplier_j = max(0.1, 1.0 - armor_value_j * 0.5)
+    armor_value_j = calc_armor_value(t_keratins[j], t_keratin_types[j], t_keratin_complexities[j], t_sizes[j])
+    damage_multiplier_j = calc_damage_multiplier(armor_value_j)
 
     if is_same_species:
         # 共食いバイアス（飢えと闘争心に依存）
@@ -728,7 +724,7 @@ def debug_energy_trace(taro_alive, t_energies, t_sizes, t_speeds, t_ages, frame_
     energies = t_energies[alive_idx]
     print(f"Frame {frame_count}:")
     print(f"  生存数: {len(alive_idx)}")
-    print(f"  エネルギー: min={energies.min():.1f}, max={energies.max():.1f}, mean={energies.mean():.1f}")
+    print("  エネルギー: min=", energies.min(), " max=", energies.max(), " mean=", energies.mean())
 # ------------------------------------------
 # 📦 8. 通信・描画用データ抽出システム
 # ------------------------------------------
