@@ -1,5 +1,5 @@
 from pytest import approx
-from src.calc import calc_mass, calc_grass_efficiency,calc_fermentation_bonus
+from src.calc import calc_mass, calc_grass_efficiency,calc_fermentation_bonus,calc_cold_resistance
 
 """calc_massのテスト"""
 #To Do:approxについて調べる(済み)
@@ -41,3 +41,13 @@ def test_fermentation_scales_with_microbiome():
 def test_fermentation_requires_organ():   
     assert calc_fermentation_bonus(0.5,0.5,0.0,0.0) == 0.0
     assert calc_fermentation_bonus(0.5,0.9,0.0,0.0) == 0.0
+
+"""calc_cold_resistanceのテスト"""
+def test_fat_cold_resistance():
+    assert calc_cold_resistance(0.9,0.5,0.5,0.5) >= calc_cold_resistance(0.1,0.5,0.5,0.5)
+def test_hair_cold_resistance():
+    assert calc_cold_resistance(0.5, 0.8, 0.0, 0.0) >= calc_cold_resistance(0.5, 0.8, 0.0, 0.9)
+def test_fether_cold_resistance():
+    assert calc_cold_resistance(0.5,0.8,1.0,1.0) >= calc_cold_resistance(0.5,0.8,1.0,0.0)
+def test_Adaptation_value():
+    assert 0.0 <= calc_cold_resistance(1.0,1.0,1.0,1.0) <= 1.0
