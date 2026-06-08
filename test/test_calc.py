@@ -1,5 +1,5 @@
 from pytest import approx
-from src.calc import calc_mass, calc_grass_efficiency,calc_fermentation_bonus,calc_cold_resistance
+from src.calc import calc_mass, calc_grass_efficiency,calc_fermentation_bonus,calc_cold_resistance,calc_armor_value
 
 """calc_massのテスト"""
 #To Do:approxについて調べる(済み)
@@ -51,3 +51,16 @@ def test_fether_cold_resistance():
     assert calc_cold_resistance(0.5,0.8,1.0,1.0) >= calc_cold_resistance(0.5,0.8,1.0,0.0)
 def test_Adaptation_value():
     assert 0.0 <= calc_cold_resistance(1.0,1.0,1.0,1.0) <= 1.0
+
+"""calc_armor_valueのテスト"""
+def test_armor_amunt_keratin():
+    assert calc_armor_value(0.9,0.5,0.5,0.5) >= calc_armor_value(0.1,0.5,0.5,0.5)
+
+def test_armor_keratin_type():
+    assert calc_armor_value(0.5,1.0,0.0,0.5) >= calc_armor_value(0.5,0.0,0.0,0.5)
+
+def test_armor_size():
+    assert calc_armor_value(0.5,0.5,0.5,2.0) >= calc_armor_value(0.5,0.5,0.5,0.5)
+
+def test_armor_complexity():
+    assert calc_armor_value(0.5,1.0,0.0,0.5) >= calc_armor_value(0.5,1.0,0.9,0.5)
