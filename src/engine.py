@@ -464,13 +464,22 @@ def attempt_mating(i, j, tx, ty, taro_alive, taro_x, taro_y, t_energies, t_fangs
             return True
     return False
 
-@njit
-def attempt_combat(i, j, is_same_species, meat_efficiency, taro_alive, taro_x, taro_y, t_energies, t_fangs, t_sizes, t_aggros, t_forestomach_capas, t_cecum_sizes, t_ages, death_stats, t_staminas, t_max_staminas, t_muscle_ratio, meat_x, meat_y, meat_amount, meat_active, meat_age, t_keratins, t_keratin_types, t_keratin_complexities):
-    attack_cost = 10.0 * (1.0 + t_muscle_ratio[i] * 2.0)
-    t_staminas[i] = max(0.0, t_staminas[i] - attack_cost)
-    defense_cost = 5.0 * (1.0 + t_muscle_ratio[j] * 2.0)
-    t_staminas[j] = max(0.0, t_staminas[j] - defense_cost)
+@njit 
+def attempt_combat(i, j, meat_efficiency,
+                   t_fangs, t_sizes, t_intestine_lens, t_true_stomach_acidities, 
+                   taro_alive, taro_x, taro_y, t_energies, t_aggros,
+                   t_forestomach_capas, t_cecum_sizes, t_ages, death_stats,
+                   t_staminas, t_max_staminas, t_muscle_ratio,
+                   meat_x, meat_y, meat_amount, meat_active, meat_age,
+                   t_keratins, t_keratin_types, t_keratin_complexities):
     
+    # 関数の先頭に追加
+    M = calc_morpho_distance(
+        t_fangs[i], t_fangs[j], t_sizes[i], t_sizes[j],
+        t_intestine_lens[i], t_intestine_lens[j],
+        t_true_stomach_acidities[i], t_true_stomach_acidities[j]
+    )
+    is_same_species = M < 0.4
     fatigue_ratio_j = max(0.0, (t_staminas[j] / (t_max_staminas[j] + 0.001)) - 0.5) * 2.0
 
     # 🛡️ 防御側(j)の物理防御力を計算: βケラチン × 単純構造(鱗)
@@ -574,7 +583,13 @@ def process_interactions(taro_x, taro_y, taro_alive, t_energies, t_fangs, t_size
                                acted = attempt_mating(i, j, tx, ty, taro_alive, taro_x, taro_y, t_energies, t_fangs, t_sizes, t_speeds, t_aggros, t_intels, t_visions, t_true_stomach_acidities, t_forestomach_capas, t_intestine_lens, t_cecum_sizes, t_fears, t_ages, t_microbiome, t_max_staminas, t_lung_capas, t_muscle_ratio, t_staminas, t_cooldowns, t_metabolisms, t_fat_ratios, t_keratins, t_keratin_types, t_keratin_complexities, t_nerve_densities)
                             if not acted:
                                # 同種判定: 形態的距離で判断（行動形質は無視）
-                               acted = attempt_combat(i, j, (M < 0.4), meat_efficiency, taro_alive, taro_x, taro_y, t_energies, t_fangs, t_sizes, t_aggros, t_forestomach_capas, t_cecum_sizes, t_ages, death_stats, t_staminas, t_max_staminas, t_muscle_ratio, meat_x, meat_y, meat_amount, meat_active, meat_age, t_keratins, t_keratin_types, t_keratin_complexities)
+                               acted = attempt_combat(i, j, meat_efficiency,
+                                                        t_fangs, t_sizes, t_intestine_lens, t_true_stomach_acidities,
+                                                        taro_alive, taro_x, taro_y, t_energies, t_aggros,
+                                                        t_forestomach_capas, t_cecum_sizes, t_ages, death_stats,
+                                                        t_staminas, t_max_staminas, t_muscle_ratio,
+                                                        meat_x, meat_y, meat_amount, meat_active, meat_age,
+                                                        t_keratins, t_keratin_types, t_keratin_complexities)
                             if acted: break
                     if acted: break
                     
