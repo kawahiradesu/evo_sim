@@ -1,5 +1,5 @@
 from pytest import approx
-from src.calc import calc_mass, calc_grass_efficiency
+from src.calc import calc_mass, calc_grass_efficiency,calc_fermentation_bonus
 
 """calc_massのテスト"""
 #To Do:approxについて調べる(済み)
@@ -32,3 +32,12 @@ def test_organ_effect():
 def test_lowest_value():
     assert calc_grass_efficiency(0.0,0.0,0.0,0.0) >= 0.0
     assert calc_grass_efficiency(0.0,0.0,0.0,0.9) >= 0.0
+
+"""calc_fermentation_bonusのテスト"""
+def test_fermentation_scales_with_organ():
+    assert calc_fermentation_bonus(0.5,0.5,0.8,0.5) >= calc_fermentation_bonus(0.5,0.5,0.1,0.5)
+def test_fermentation_scales_with_microbiome(): 
+    assert calc_fermentation_bonus(0.5,0.9,0.5,0.5) >= calc_fermentation_bonus(0.5,0.1,0.5,0.5)
+def test_fermentation_requires_organ():   
+    assert calc_fermentation_bonus(0.5,0.5,0.0,0.0) == 0.0
+    assert calc_fermentation_bonus(0.5,0.9,0.0,0.0) == 0.0
