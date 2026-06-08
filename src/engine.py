@@ -368,25 +368,6 @@ def update_ai_integrated(taro_x, taro_y, taro_alive, t_energies, t_visions, t_fa
 # 💞 5. 遺伝・交配・戦闘システム
 # ------------------------------------------
 @njit
-def get_genetic_distance(i, j, t_fangs, t_sizes, t_speeds, t_aggros, t_intels, t_true_stomach_acidities, t_forestomach_capas, t_intestine_lens, t_cecum_sizes):
-    # 全遺伝子距離（繁殖互換性の判定に使用）
-    D_sq = ((t_fangs[i] - t_fangs[j])**2 + ((t_sizes[i] - t_sizes[j]) / 3.0)**2 + ((t_speeds[i] - t_speeds[j]) / 4.0)**2 +
-            (t_aggros[i] - t_aggros[j])**2 + (t_intels[i] - t_intels[j])**2 + (t_true_stomach_acidities[i] - t_true_stomach_acidities[j])**2 +
-            (t_forestomach_capas[i] - t_forestomach_capas[j])**2 + (t_intestine_lens[i] - t_intestine_lens[j])**2 + (t_cecum_sizes[i] - t_cecum_sizes[j])**2)
-    return D_sq ** 0.5
-
-@njit
-def get_morpho_distance(i, j, t_fangs, t_sizes, t_intestine_lens, t_true_stomach_acidities):
-    # 形態的距離（同種判定に使用）
-    # 生物学的根拠: 種の同一性は行動形質(aggros/intels/fears)ではなく
-    # 体の構造(牙・サイズ・消化器官)で決まる。黒人と白人が同種なのと同じ。
-    D_sq = ((t_fangs[i] - t_fangs[j])**2 +
-            (t_sizes[i] - t_sizes[j])**2 +
-            (t_intestine_lens[i] - t_intestine_lens[j])**2 +
-            (t_true_stomach_acidities[i] - t_true_stomach_acidities[j])**2)
-    return D_sq ** 0.5
-
-@njit
 def attempt_mating(i, j, tx, ty, taro_alive, taro_x, taro_y, t_energies, t_fangs, t_sizes, t_speeds, t_aggros, t_intels, t_visions, t_true_stomach_acidities, t_forestomach_capas, t_intestine_lens, t_cecum_sizes, t_fears, t_ages, t_microbiome, t_max_staminas, t_lung_capas, t_muscle_ratio, t_staminas, t_cooldowns, t_metabolisms, t_fat_ratios, t_keratins, t_keratin_types, t_keratin_complexities, t_nerve_densities):
     
     # 🌟 NEW: 性成熟は「体のサイズ」に比例する！（小さいほど早熟）
