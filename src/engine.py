@@ -126,7 +126,7 @@ def update_movement_and_stamina(taro_x, taro_y, taro_alive, t_angles, t_speeds, 
             # 寒冷耐性の計算: 脂肪 + 獣毛(αケラチン×単純) または ダウン(βケラチン×複雑)
             cold_resistance = calc_cold_resistance(t_fat_ratios[i], t_keratins[i], t_keratin_types[i], t_keratin_complexities[i])
             # 10度を下回った分だけ、耐性がないとダメージを受ける
-            damage = (10.0 - local_temp) * (1.0 - cold_resistance) * 0.1 # 1フレームあたりのダメージ
+            damage = (10.0 - local_temp) * (1.0 - cold_resistance) * 0.01 # 1フレームあたりのダメージ
             t_energies[i] -= damage
 
         # スタミナの消費と回復
