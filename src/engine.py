@@ -368,6 +368,58 @@ def update_ai_integrated(taro_x, taro_y, taro_alive, t_energies, t_visions, t_fa
 # 💞 5. 遺伝・交配・戦闘システム
 # ------------------------------------------
 @njit
+def spawn_child(child_idx, i, j, tx, ty, pool,
+                taro_alive, taro_x, taro_y, t_energies,
+                t_ages, t_cooldowns,
+                t_fangs, t_sizes, t_speeds, t_aggros, t_intels, t_fears, t_visions,
+                t_true_stomach_acidities, t_forestomach_capas, t_intestine_lens, t_cecum_sizes,
+                t_max_staminas, t_lung_capas, t_muscle_ratio, t_staminas,
+                t_microbiome, t_metabolisms, t_fat_ratios,
+                t_keratins, t_keratin_types, t_keratin_complexities, t_nerve_densities):
+    """子の初期化とDNA生成"""
+    taro_alive[child_idx] = True
+    t_ages[child_idx] = 0
+    t_cooldowns[child_idx] = 0
+    taro_x[child_idx] = max(0.0, min(tx + np.random.uniform(-2.0, 2.0), WORLD_SIZE - 0.001))
+    taro_y[child_idx] = max(0.0, min(ty + np.random.uniform(-2.0, 2.0), WORLD_SIZE - 0.001))
+    t_energies[child_idx] = pool * 0.50
+
+    # DNAブレンド（ガウス変異ベース）
+    t_fangs[child_idx]   = max(0.0, min(1.0, (t_fangs[i]   if np.random.random() < 0.5 else t_fangs[j])   + np.random.normal(0, 0.05)))
+    t_sizes[child_idx]   = max(0.5, min(3.0, (t_sizes[i]   if np.random.random() < 0.5 else t_sizes[j])   + np.random.normal(0, 0.1)))
+    t_speeds[child_idx]  = max(0.5, min(4.0, (t_speeds[i]  if np.random.random() < 0.5 else t_speeds[j])  + np.random.normal(0, 0.1)))
+    t_aggros[child_idx]  = max(0.0, min(1.0, (t_aggros[i]  if np.random.random() < 0.5 else t_aggros[j])  + np.random.normal(0, 0.05)))
+    t_intels[child_idx]  = max(0.0, min(1.0, (t_intels[i]  if np.random.random() < 0.5 else t_intels[j])  + np.random.normal(0, 0.05)))
+    t_fears[child_idx]   = max(0.0, min(1.0, (t_fears[i]   if np.random.random() < 0.5 else t_fears[j])   + np.random.normal(0, 0.05)))
+    t_visions[child_idx] = max(3.0, min(30.0,(t_visions[i] if np.random.random() < 0.5 else t_visions[j]) + np.random.normal(0, 1.0)))
+
+    t_true_stomach_acidities[child_idx] = max(0.0, min(1.0, (t_true_stomach_acidities[i] if np.random.random() < 0.5 else t_true_stomach_acidities[j]) + np.random.normal(0, 0.05)))
+    t_intestine_lens[child_idx]         = max(0.0, min(1.0, (t_intestine_lens[i]         if np.random.random() < 0.5 else t_intestine_lens[j])         + np.random.normal(0, 0.05)))
+    t_forestomach_capas[child_idx]      = max(0.0, min(1.0, (t_forestomach_capas[i]      if np.random.random() < 0.5 else t_forestomach_capas[j])      + np.random.normal(0, 0.05)))
+    t_cecum_sizes[child_idx]            = max(0.0, min(1.0, (t_cecum_sizes[i]            if np.random.random() < 0.5 else t_cecum_sizes[j])            + np.random.normal(0, 0.05)))
+
+    t_max_staminas[child_idx] = max(10.0, (t_max_staminas[i] if np.random.random() < 0.5 else t_max_staminas[j]) + np.random.normal(0, 10.0))
+    t_lung_capas[child_idx]   = max(0.05, min(1.5, (t_lung_capas[i]   if np.random.random() < 0.5 else t_lung_capas[j])   + np.random.normal(0, 0.05)))
+    t_muscle_ratio[child_idx] = max(0.0,  min(1.0, (t_muscle_ratio[i] if np.random.random() < 0.5 else t_muscle_ratio[j]) + np.random.normal(0, 0.05)))
+    t_staminas[child_idx] = t_max_staminas[child_idx]
+
+    acid_filter = 1.0 - t_true_stomach_acidities[child_idx] * 0.5
+    base_micro = t_microbiome[i] if np.random.random() < 0.5 else t_microbiome[j]
+    t_microbiome[child_idx] = max(0.0, min(1.0, base_micro * acid_filter + np.random.uniform(-0.05, 0.05)))
+
+    t_metabolisms[child_idx]        = max(0.0, min(1.0, (t_metabolisms[i]        if np.random.random() < 0.5 else t_metabolisms[j])        + np.random.normal(0, 0.05)))
+    t_fat_ratios[child_idx]         = max(0.0, min(1.0, (t_fat_ratios[i]         if np.random.random() < 0.5 else t_fat_ratios[j])         + np.random.normal(0, 0.05)))
+    t_keratins[child_idx]           = max(0.0, min(1.0, (t_keratins[i]           if np.random.random() < 0.5 else t_keratins[j])           + np.random.normal(0, 0.05)))
+    t_keratin_complexities[child_idx] = max(0.0, min(1.0, (t_keratin_complexities[i] if np.random.random() < 0.5 else t_keratin_complexities[j]) + np.random.normal(0, 0.05)))
+    t_nerve_densities[child_idx]    = max(0.0, min(1.0, (t_nerve_densities[i]    if np.random.random() < 0.5 else t_nerve_densities[j])    + np.random.normal(0, 0.05)))
+
+    base_type = t_keratin_types[i] if np.random.random() < 0.5 else t_keratin_types[j]
+    if np.random.random() < 0.01:
+        base_type = 1.0 - base_type
+    t_keratin_types[child_idx] = base_type
+    return
+
+@njit
 def attempt_mating(i, j, tx, ty, taro_alive, taro_x, taro_y, t_energies, t_fangs, t_sizes, t_speeds, t_aggros, t_intels, t_visions, t_true_stomach_acidities, t_forestomach_capas, t_intestine_lens, t_cecum_sizes, t_fears, t_ages, t_microbiome, t_max_staminas, t_lung_capas, t_muscle_ratio, t_staminas, t_cooldowns, t_metabolisms, t_fat_ratios, t_keratins, t_keratin_types, t_keratin_complexities, t_nerve_densities):
     
     # 🌟 NEW: 性成熟は「体のサイズ」に比例する！（小さいほど早熟）
@@ -401,85 +453,14 @@ def attempt_mating(i, j, tx, ty, taro_alive, taro_x, taro_y, t_energies, t_fangs
             t_cooldowns[i] = pregnancy_time
             t_cooldowns[j] = 30  # 50→30
             
-            # --- 子の基本ステータス初期化（1回だけ！） ---
-            taro_alive[child_idx] = True
-            t_ages[child_idx] = 0
-            t_cooldowns[child_idx] = 0
-            # 親の近くに生まれる（壁を突き抜けないよう max/min でクランプ）
-            taro_x[child_idx] = max(0.0, min(tx + np.random.uniform(-2.0, 2.0), WORLD_SIZE - 0.001))
-            taro_y[child_idx] = max(0.0, min(ty + np.random.uniform(-2.0, 2.0), WORLD_SIZE - 0.001))
-            t_energies[child_idx] = pool * 0.50
-
-            # DNAブレンド（ガウス変異ベース）
-            # 牙 (Fangs)
-            base_fang = t_fangs[i] if np.random.random() < 0.5 else t_fangs[j]
-            t_fangs[child_idx] = max(0.0, min(1.0, base_fang + np.random.normal(0, 0.05)))
-            
-            # サイズ (Sizes)
-            base_size = t_sizes[i] if np.random.random() < 0.5 else t_sizes[j]
-            t_sizes[child_idx] = max(0.5, min(3.0, base_size + np.random.normal(0, 0.1)))
-            
-            # スピード (Speeds)
-            base_speed = t_speeds[i] if np.random.random() < 0.5 else t_speeds[j]
-            t_speeds[child_idx] = max(0.5, min(4.0, base_speed + np.random.normal(0, 0.1)))
-            
-            # 闘争心 (Aggros)
-            base_aggro = t_aggros[i] if np.random.random() < 0.5 else t_aggros[j]
-            t_aggros[child_idx] = max(0.0, min(1.0, base_aggro + np.random.normal(0, 0.05)))
-            
-            # 知能と恐怖 (Intels & Fears)
-            base_intel = t_intels[i] if np.random.random() < 0.5 else t_intels[j]
-            t_intels[child_idx] = max(0.0, min(1.0, base_intel + np.random.normal(0, 0.05)))
-            base_fear = t_fears[i] if np.random.random() < 0.5 else t_fears[j]
-            t_fears[child_idx] = max(0.0, min(1.0, base_fear + np.random.normal(0, 0.05)))
-            
-            # 視界 (Visions) — 他の形質と同様に遺伝＋変異させる
-            base_vision = t_visions[i] if np.random.random() < 0.5 else t_visions[j]
-            t_visions[child_idx] = max(3.0, min(30.0, base_vision + np.random.normal(0, 1.0)))
-            
-            # 消化器官 (Organs) - まとめて遺伝する確率も持たせるとよりリアルですが、今回は独立交叉
-            base_acid = t_true_stomach_acidities[i] if np.random.random() < 0.5 else t_true_stomach_acidities[j]
-            t_true_stomach_acidities[child_idx] = max(0.0, min(1.0, base_acid + np.random.normal(0, 0.05)))
-            
-            base_intestine = t_intestine_lens[i] if np.random.random() < 0.5 else t_intestine_lens[j]
-            t_intestine_lens[child_idx] = max(0.0, min(1.0, base_intestine + np.random.normal(0, 0.05)))
-            
-            base_fore = t_forestomach_capas[i] if np.random.random() < 0.5 else t_forestomach_capas[j]
-            t_forestomach_capas[child_idx] = max(0.0, min(1.0, base_fore + np.random.normal(0, 0.05)))
-            
-            base_cecum = t_cecum_sizes[i] if np.random.random() < 0.5 else t_cecum_sizes[j]
-            t_cecum_sizes[child_idx] = max(0.0, min(1.0, base_cecum + np.random.normal(0, 0.05)))
-            
-            # スタミナ・運動系
-            base_max_stam = t_max_staminas[i] if np.random.random() < 0.5 else t_max_staminas[j]
-            t_max_staminas[child_idx] = max(10.0, base_max_stam + np.random.normal(0, 10.0))
-            
-            base_lung = t_lung_capas[i] if np.random.random() < 0.5 else t_lung_capas[j]
-            t_lung_capas[child_idx] = max(0.05, min(1.5, base_lung + np.random.normal(0, 0.05)))
-            
-            base_muscle = t_muscle_ratio[i] if np.random.random() < 0.5 else t_muscle_ratio[j]
-            t_muscle_ratio[child_idx] = max(0.0, min(1.0, base_muscle + np.random.normal(0, 0.05)))
-            
-            t_staminas[child_idx] = t_max_staminas[child_idx]
-            
-            # 細菌（腸内環境は親から子へそのまま受け継ぐが、少し揺らぐ）
-            acid_filter = 1.0 - t_true_stomach_acidities[child_idx] * 0.5
-            base_micro = t_microbiome[i] if np.random.random() < 0.5 else t_microbiome[j]
-            t_microbiome[child_idx] = max(0.0, min(1.0, base_micro * acid_filter + np.random.uniform(-0.05, 0.05)))
-            
-            # 🧬 NEW: 環境適応・体表遺伝子
-            t_metabolisms[child_idx] = max(0.0, min(1.0, (t_metabolisms[i] if np.random.random() < 0.5 else t_metabolisms[j]) + np.random.normal(0, 0.05)))
-            t_fat_ratios[child_idx] = max(0.0, min(1.0, (t_fat_ratios[i] if np.random.random() < 0.5 else t_fat_ratios[j]) + np.random.normal(0, 0.05)))
-            t_keratins[child_idx] = max(0.0, min(1.0, (t_keratins[i] if np.random.random() < 0.5 else t_keratins[j]) + np.random.normal(0, 0.05)))
-            
-            # α/βケラチンの系統制約（タイプは突然変異しにくい、0か1かに寄せる）
-            base_type = t_keratin_types[i] if np.random.random() < 0.5 else t_keratin_types[j]
-            if np.random.random() < 0.01: base_type = 1.0 - base_type # 1%の確率で系統反転
-            t_keratin_types[child_idx] = base_type
-            
-            t_keratin_complexities[child_idx] = max(0.0, min(1.0, (t_keratin_complexities[i] if np.random.random() < 0.5 else t_keratin_complexities[j]) + np.random.normal(0, 0.05)))
-            t_nerve_densities[child_idx] = max(0.0, min(1.0, (t_nerve_densities[i] if np.random.random() < 0.5 else t_nerve_densities[j]) + np.random.normal(0, 0.05)))
-            
+            spawn_child(child_idx, i, j, tx, ty, pool,
+            taro_alive, taro_x, taro_y, t_energies,
+            t_ages, t_cooldowns,
+            t_fangs, t_sizes, t_speeds, t_aggros, t_intels, t_fears, t_visions,
+            t_true_stomach_acidities, t_forestomach_capas, t_intestine_lens, t_cecum_sizes,
+            t_max_staminas, t_lung_capas, t_muscle_ratio, t_staminas,
+            t_microbiome, t_metabolisms, t_fat_ratios,
+            t_keratins, t_keratin_types, t_keratin_complexities, t_nerve_densities)
             return True
     return False
 
