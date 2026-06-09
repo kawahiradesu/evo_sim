@@ -249,6 +249,8 @@ def run_simulation():
         # 多様性を保ちつつ、虫食効率が高い個体を優遇する
         t_fangs[i] = np.random.normal(0.5, 0.10)  # 平均 0.5, 標準偏差 0.10
         t_fangs[i] = np.clip(t_fangs[i], 0.0, 1.0)  # 0.0～1.0 の範囲に制限
+        # 単位をmと定義
+        # 初期値：イクチオステガ ≈ 1.0m
         t_sizes[i] = np.random.uniform(0.8, 1.2)
         
         # 闘争本能は普通（虫メインだけど、たまに共食いする）
@@ -330,7 +332,7 @@ def run_simulation():
         # 各関数に必要なグリッドデータを渡す
         engine.update_ai_integrated(taro_x, taro_y, taro_alive, t_energies, t_visions, t_fangs, t_sizes, t_aggros, t_intels, t_fears, t_angles, meat_x, meat_y, meat_active, m_counts, m_idx, t_counts, t_idx, t_true_stomach_acidities, t_forestomach_capas, t_intestine_lens, t_microbiome, grass_grids, t_speeds, t_current_speeds, river_grids, t_keratins, t_nerve_densities)
         
-        engine.update_movement_and_stamina(taro_x, taro_y, taro_alive, t_angles, t_speeds, t_current_speeds, t_sizes, t_staminas, t_max_staminas, t_lung_capas, t_muscle_ratio, t_energies, river_grids, t_fat_ratios, t_keratins, t_keratin_types, t_keratin_complexities, altitude_grids, global_temperature)
+        engine.update_movement_and_stamina(taro_x, taro_y, taro_alive, t_angles, t_speeds, t_current_speeds, t_sizes, t_staminas, t_max_staminas, t_lung_capas, t_muscle_ratio, t_energies, river_grids, t_fat_ratios, t_keratins, t_keratin_types, t_keratin_complexities, altitude_grids, global_temperature,t_intestine_lens)
         
         engine.process_interactions(taro_x, taro_y, taro_alive, t_energies, t_fangs, t_sizes, t_true_stomach_acidities, t_forestomach_capas, t_intestine_lens, t_cecum_sizes, t_speeds, t_visions, t_aggros, t_intels, t_fears, meat_x, meat_y, meat_amount, meat_active, m_counts, m_idx, t_counts, t_idx, t_ages, t_microbiome, grass_grids, death_stats, t_max_staminas, t_lung_capas, t_muscle_ratio, t_staminas, meat_age, t_cooldowns, t_metabolisms, t_fat_ratios, t_keratins, t_keratin_types, t_keratin_complexities, t_nerve_densities)
 

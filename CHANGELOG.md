@@ -204,4 +204,159 @@ engine.pyの行数変化：
 
 ---
 
+## #003 — 寒冷ダメージによる絶滅
+
+**日付：** 未記入  
+**対象ファイル：** `engine.py`
+
+---
+
+### 🔴 症状
+
+Frame1600以降、最後の1匹がエネルギー2500以上を保ちながらFrame4600で突然死。草食個体が最初から最後まで0匹。
+
+---
+
+### 🔍 診断
+
+**寒冷ダメージがbase_costの6〜14倍だった。**
+
+```
+global_temperature = 10.0 + sun_angle * 15.0
+→ 冬の気温：-5度（平地）、-25度（高地）
+
+damage/frame = (10.0 - local_temp) * (1.0 - cold_resistance) * 0.1
+→ 冬・平地・耐性ゼロ：1.50/frame
+→ 冬・高地・耐性ゼロ：3.50/frame
+→ base_cost（通常）：0.25/frame
+```
+
+初期太郎はイクチオステガ想定で `fat=0〜0.3`、`keratin=0〜0.3` のため寒冷耐性がほぼゼロ。冬が来るたびに集団全体が衰弱して絶滅していた。
+
+草食0匹は `fermentation_bonus` 修正の影響ではなく、冬の間に草食に進化する前に死んでいたことが原因。
+
+---
+
+### 💡 設計意図
+
+気温グラデーション（緯度・地形による温度差）と AI の不快度への組み込みは将来実装予定。今は係数調整で対処し、シムを安定させることを優先する。
+
+---
+
+### 📝 差分
+
+**`engine.py` — `update_movement_and_stamina()`**
+
+```python
+# 変更前
+damage = (10.0 - local_temp) * (1.0 - cold_resistance) * 0.1
+
+# 変更後
+damage = (10.0 - local_temp) * (1.0 - cold_resistance) * 0.01
+```
+
+---
+
+### 👁️ 観察（後から記入）
+
+```
+実施日：
+安定したフレーム数：
+草食個体が出現し始めたフレーム：
+特記事項：
+```
+
+---
+
+## #004 — fermentation_bonusの腸フォールバック追加
+
+**日付：** 未記入  
+**対象ファイル：** `calc.py`、`engine.py`、`test/test_calc.py`
+
+---
+
+### 🔴 症状
+
+草食個体が一匹も生まれない。全員が雑食・肉食に収束する。
+
+---
+
+### 🔍 診断
+
+`#001` の修正（臓器に発酵をロック）が強すぎた。前胃・盲腸がゼロの個体は草から一切栄養が取れない崖ができていた。初期太郎はイクチオステガ想定で臓器がほぼゼロのため、草食への進化経路が完全に閉ざされていた。
+
+```python
+# 問題のある式
+housing_capacity = actual_forestomach + actual_cecum
+# → 臓器ゼロなら housing=0 → fermentation=0 → 草から栄養ゼロ
+```
+
+**生物学的な問題：** 腸内細菌は前胃・盲腸がなくても腸の中に住んでいる。専用臓器は「菌の数を増やす場所」であって「菌がいる唯一の場所」ではない。
+
+---
+
+### 💡 設計意図
+
+腸そのものを最低限の住処として機能させる。専用臓器の優位性は保ちつつ「ゼロか否かの崖」をなくす。
+
+```
+腸だけ（intestine_len=0.5）       → housing=0.10（微量の発酵）
+草食臓器フル（fore+cecum=0.8）    → housing=0.80（高効率の発酵）
+草食専門 vs 初期太郎の差：50点   → 専門家の優位性は保たれている
+```
+
+---
+
+### 📝 差分
+
+**`calc.py` — `calc_fermentation_bonus()`**
+
+```python
+# 変更前
+housing_capacity = actual_forestomach + actual_cecum
+
+# 変更後（intestine_lenを引数に追加）
+housing_capacity = (intestine_len * 0.2) + actual_forestomach + actual_cecum
+```
+
+**`engine.py` — `process_interactions()`**
+
+```python
+# 変更前
+fermentation_bonus = calc_fermentation_bonus(eat_amount, t_microbiome[i], actual_forestomach, actual_cecum)
+
+# 変更後
+fermentation_bonus = calc_fermentation_bonus(eat_amount, t_microbiome[i], actual_forestomach, actual_cecum, t_intestine_lens[i])
+```
+
+**`calc.py` — import修正**
+
+```python
+# VSCodeのRunボタンでも動くように
+try:
+    from config import *
+except ModuleNotFoundError:
+    from src.config import *
+```
+
+**`test/test_calc.py` — テスト追加**
+
+```python
+def test_fermentation_intestine_fallback():
+    assert calc_fermentation_bonus(20.0, 0.9, 0.0, 0.0, 0.5) > 0.0
+```
+
+---
+
+### 👁️ 観察（後から記入）
+
+```
+実施日：
+草食個体が出現し始めたフレーム：
+草食の割合の推移：
+特記事項：
+```
+
+---
+
 *— ログここまで —*

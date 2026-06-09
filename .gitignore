@@ -1,0 +1,15 @@
+# Pythonキャッシュ
+__pycache__/
+*.pyc
+# pytestのキャッシュ
+.pytest_cache/
+
+# エディタ・ツール系
+.vscode/
+# Mac特有のシステムファイル
+.DS_Store
+
+# 今回除外するボツデータ・メモ等
+archive😭/
+for_study/
+ecs_demo.py/
