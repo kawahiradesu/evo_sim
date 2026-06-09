@@ -1,6 +1,6 @@
 from pytest import approx
 from src.calc import calc_mass, calc_grass_efficiency,calc_fermentation_bonus,calc_cold_resistance,calc_armor_value,calc_genetic_distance,calc_morpho_distance
-
+from src.config import *
 """calc_massのテスト"""
 #To Do:approxについて調べる(済み)
 def test_calc_mass_baseline():
@@ -35,12 +35,15 @@ def test_lowest_value():
 
 """calc_fermentation_bonusのテスト"""
 def test_fermentation_scales_with_organ():
-    assert calc_fermentation_bonus(0.5,0.5,0.8,0.5) >= calc_fermentation_bonus(0.5,0.5,0.1,0.5)
+    assert calc_fermentation_bonus(0.5,0.5,0.8,0.5,0.0) >= calc_fermentation_bonus(0.5,0.5,0.1,0.5,0.0)
 def test_fermentation_scales_with_microbiome(): 
-    assert calc_fermentation_bonus(0.5,0.9,0.5,0.5) >= calc_fermentation_bonus(0.5,0.1,0.5,0.5)
+    assert calc_fermentation_bonus(0.5,0.9,0.5,0.5,0.0) >= calc_fermentation_bonus(0.5,0.1,0.5,0.5,0.0)
 def test_fermentation_requires_organ():   
-    assert calc_fermentation_bonus(0.5,0.5,0.0,0.0) == 0.0
-    assert calc_fermentation_bonus(0.5,0.9,0.0,0.0) == 0.0
+    assert calc_fermentation_bonus(0.5,0.5,0.0,0.0,0.0) == 0.0
+    assert calc_fermentation_bonus(0.5,0.9,0.0,0.,0.0) == 0.0
+# 臓器なし・腸ありでも微量の発酵が起きる
+def test_fermentation_intestine_fallback():
+    assert calc_fermentation_bonus(20.0, 0.9, 0.0, 0.0, 0.5) > 0.0
 
 """calc_cold_resistanceのテスト"""
 def test_fat_cold_resistance():

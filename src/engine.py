@@ -4,7 +4,10 @@
 import numpy as np
 # random モジュールは np.random に統一（Numba最適化のため）
 from numba import njit
-from config import *
+try:
+    from config import *
+except ModuleNotFoundError:
+    from src.config import *
 from calc import *
 # ------------------------------------------
 # 🌿 1. 環境システム（植物とグリッド）
@@ -602,7 +605,9 @@ def process_interactions(taro_x, taro_y, taro_alive, t_energies, t_fangs, t_size
                             
                             acid_penalty       = calc_acid_penalty(t_true_stomach_acidities[i])
                             base_digestion     = eat_amount * grass_efficiency * acid_penalty
-                            fermentation_bonus = calc_fermentation_bonus(eat_amount, t_microbiome[i], actual_forestomach, actual_cecum)
+                            fermentation_bonus = calc_fermentation_bonus(
+                                eat_amount, t_microbiome[i], actual_forestomach, actual_cecum, t_intestine_lens[i]
+                            )
                             t_energies[i] += (base_digestion + fermentation_bonus)  
                             
                             # 🦠 生物学的根拠: 胃酸が強いと摂取した植物由来の草食菌が胃で殺菌される。

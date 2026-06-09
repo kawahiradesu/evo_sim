@@ -15,7 +15,10 @@
 
 import numpy as np
 from numba import njit
-from src.config import *
+try:
+    from config import *
+except ModuleNotFoundError:
+    from src.config import *
 
 
 # ------------------------------------------
@@ -83,7 +86,7 @@ def calc_grass_efficiency(actual_forestomach, actual_cecum, intestine_len, fangs
 
 
 @njit
-def calc_fermentation_bonus(eat_amount, microbiome, actual_forestomach, actual_cecum):
+def calc_fermentation_bonus(eat_amount, microbiome, actual_forestomach, actual_cecum, intestine_len):
     """
     発酵ボーナス（腸内細菌による草からの追加エネルギー）
 
@@ -93,7 +96,7 @@ def calc_fermentation_bonus(eat_amount, microbiome, actual_forestomach, actual_c
       - 臓器なしでは菌が定着できないため発酵は起きない
       - 臓器を獲得してから菌が定着するまでタイムラグが生まれる（生物学的に正しい）
     """
-    housing_capacity = actual_forestomach + actual_cecum
+    housing_capacity = (intestine_len * 0.2) + actual_forestomach + actual_cecum
     effective_microbiome = microbiome * housing_capacity
     return eat_amount * effective_microbiome * 3.0
 
