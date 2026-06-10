@@ -13,7 +13,7 @@ from calc import *
 # 🌿 1. 環境システム（植物とグリッド）
 # ------------------------------------------
 @njit
-def process_plants(tree_grids, grass_grids, moisture_grids, altitude_grids, global_temperature, global_sunlight):
+def process_plants(tree_grids, grass_grids, moisture_grids, temperature_grids, global_sunlight,altitude_grids):
     """植物の成長（光獲得競争と季節変動）"""
     for r in range(GRID_SIZE):
         for c in range(GRID_SIZE):
@@ -21,7 +21,7 @@ def process_plants(tree_grids, grass_grids, moisture_grids, altitude_grids, glob
             alt = altitude_grids[r, c]
             
             # 🌡️ 局所気温: 標高が高いほど寒い（0.0〜1.0の高度で最大-20度のペナルティ）
-            local_temp = global_temperature - (alt * 20.0)
+            local_temp = temperature_grids[r, c]
             
             # 気温が氷点下（0度以下）になると成長停止・枯死が始まる
             temp_factor = max(0.0, min(1.0, local_temp / 15.0))
@@ -56,7 +56,22 @@ def process_plants(tree_grids, grass_grids, moisture_grids, altitude_grids, glob
             if local_temp < 5.0:
                 grass_grids[r, c] -= (5.0 - local_temp) * 0.5
                 
+
             if grass_grids[r, c] < 0.0: grass_grids[r, c] = 0.0
+@njit
+def update_temperature_grids(temperature_grids, altitude_grids, global_temperature):
+    rows = temperature_grids.shape[0]
+    cols = temperature_grids.shape[1]
+    for r in range(rows):
+        for c in range(cols):
+            # 緯度補正：中央（赤道）が最も暖かく、端（極）に向かって冷える
+            latitude_factor = abs(r - rows / 2.0) / (rows / 2.0)  # 0.0（赤道）〜1.0（極）
+            latitude_temp   = latitude_factor * 20.0               # 極は赤道より最大20℃低い
+
+            # 高度補正
+            altitude_temp = altitude_grids[r, c] * TEMP_ALTITUDE_FACTOR
+
+            temperature_grids[r, c] = global_temperature - latitude_temp - altitude_temp
 
 @njit
 def build_grids(meat_x, meat_y, meat_active, taro_x, taro_y, taro_alive, m_counts, m_idx, t_counts, t_idx):
@@ -101,7 +116,7 @@ def has_river_crossing(src_x, src_y, target_x, river_grids):
 # 🏃‍♂️ 2. 運動・スタミナ・物理システム
 # ------------------------------------------
 @njit
-def update_movement_and_stamina(taro_x, taro_y, taro_alive, t_angles, t_speeds, t_current_speeds, t_sizes, t_staminas, t_max_staminas, t_lung_capas, t_muscle_ratio, t_energies, river_grids, t_fat_ratios, t_keratins, t_keratin_types, t_keratin_complexities, altitude_grids, global_temperature,t_intestine_lens):
+def update_movement_and_stamina(taro_x, taro_y, taro_alive, t_angles, t_speeds, t_current_speeds, t_sizes, t_staminas, t_max_staminas, t_lung_capas, t_muscle_ratio, t_energies, river_grids, t_fat_ratios, t_keratins, t_keratin_types, t_keratin_complexities, temperature_grids,t_intestine_lens):
     for i in range(len(taro_alive)):
         if not taro_alive[i]: continue
 
@@ -123,7 +138,7 @@ def update_movement_and_stamina(taro_x, taro_y, taro_alive, t_angles, t_speeds, 
         # ❄️ 寒冷ダメージ判定
         tx, ty = taro_x[i], taro_y[i]
         gx, gy = max(0, min(int(tx / GRID_SCALE), GRID_SIZE - 1)), max(0, min(int(ty / GRID_SCALE), GRID_SIZE - 1))
-        local_temp = global_temperature - (altitude_grids[gy, gx] * 20.0)
+        local_temp = temperature_grids[gy, gx]
 
         if local_temp < 10.0:
             # 寒冷耐性の計算: 脂肪 + 獣毛(αケラチン×単純) または ダウン(βケラチン×複雑)
@@ -567,14 +582,18 @@ def process_interactions(taro_x, taro_y, taro_alive, t_energies, t_fangs, t_size
                     for c in range(t_counts[nx, ny]):
                         j = t_idx[nx, ny, c]
                         if i != j and taro_alive[j] and taro_alive[i] and (taro_x[j] - tx)**2 + (taro_y[j] - ty)**2 < interact_dist_sq:
-                            D = calc_genetic_distance(
-                                t_fangs[i], t_fangs[j], t_sizes[i], t_sizes[j],
-                                t_speeds[i], t_speeds[j], t_aggros[i], t_aggros[j],
-                                t_intels[i], t_intels[j], t_true_stomach_acidities[i], t_true_stomach_acidities[j],
-                                t_forestomach_capas[i], t_forestomach_capas[j],
-                                t_intestine_lens[i], t_intestine_lens[j],
-                                t_cecum_sizes[i], t_cecum_sizes[j]
+                            # 変更後
+                            compatible = calc_reproductive_compatibility(
+                                        t_sizes[i], t_sizes[j],
+                                        t_true_stomach_acidities[i], t_true_stomach_acidities[j],
+                                        t_intestine_lens[i], t_intestine_lens[j],
+                                        t_forestomach_capas[i], t_forestomach_capas[j],
+                                        t_fangs[i], t_fangs[j],
+                                        t_speeds[i], t_speeds[j],
+                                        t_aggros[i], t_aggros[j],
+                                        t_intels[i], t_intels[j],
                             )
+
                             M = calc_morpho_distance(
                                 t_fangs[i], t_fangs[j], t_sizes[i], t_sizes[j],
                                 t_intestine_lens[i], t_intestine_lens[j],
@@ -582,7 +601,7 @@ def process_interactions(taro_x, taro_y, taro_alive, t_energies, t_fangs, t_size
                             )
                             
                             # 繁殖: 全遺伝子距離が近ければOK
-                            if D < 0.4:
+                            if compatible:
                                acted = attempt_mating(i, j, tx, ty, taro_alive, taro_x, taro_y, t_energies, t_fangs, t_sizes, t_speeds, t_aggros, t_intels, t_visions, t_true_stomach_acidities, t_forestomach_capas, t_intestine_lens, t_cecum_sizes, t_fears, t_ages, t_microbiome, t_max_staminas, t_lung_capas, t_muscle_ratio, t_staminas, t_cooldowns, t_metabolisms, t_fat_ratios, t_keratins, t_keratin_types, t_keratin_complexities, t_nerve_densities)
                             if not acted:
                                # 同種判定: 形態的距離で判断（行動形質は無視）

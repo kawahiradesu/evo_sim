@@ -18,3 +18,6 @@ TERRAIN_SCALE = 8.0        # ノイズの空間スケール（大きいほど大
 TERRAIN_OCTAVES = 4        # ノイズの重ね合わせ回数（多いほどディテール増加）
 MOUNTAIN_THRESHOLD = 0.7   # この高度以上を「山」とする（描画用）
 RIVER_THRESHOLD = 0.25     # この高度以下を「川/谷」とする
+TEMP_ALTITUDE_FACTOR = 20.0  # 高度1.0あたりの気温低下（℃）
+TEMP_BASE = 10.0              # 季節変動なしの基準気温
+TEMP_SEASON_AMP = 15.0        # 季節変動の振幅（±15℃）

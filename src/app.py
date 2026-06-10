@@ -71,6 +71,7 @@ meat_age = np.zeros(MAX_MEAT, dtype=np.int32)
 tree_grids = np.zeros((GRID_SIZE, GRID_SIZE), dtype=np.float32)  # 🌟 NEW
 grass_grids = np.zeros((GRID_SIZE, GRID_SIZE), dtype=np.float32) # 🌟 NEW
 bug_grids = np.zeros((GRID_SIZE, GRID_SIZE), dtype=np.float32)
+temperature_grids = np.zeros((GRID_SIZE, GRID_SIZE), dtype=np.float32)
 
 # 🌏 【地形系データ】
 altitude_grids = np.zeros((GRID_SIZE, GRID_SIZE), dtype=np.float32)  # 🏔️ 高度
@@ -325,14 +326,16 @@ def run_simulation():
         # エンジン処理
         # ====================================================
         # 🌟 NEW: 植物の成長処理（気温と日照に依存）
-        engine.process_plants(tree_grids, grass_grids, moisture_grids, altitude_grids, global_temperature, global_sunlight)
+        engine.update_temperature_grids(temperature_grids, altitude_grids, global_temperature)
+
+        engine.process_plants(tree_grids, grass_grids, moisture_grids, temperature_grids, global_sunlight, altitude_grids)
 
         engine.build_grids(meat_x, meat_y, meat_active, taro_x, taro_y, taro_alive, m_counts, m_idx, t_counts, t_idx)
         
         # 各関数に必要なグリッドデータを渡す
         engine.update_ai_integrated(taro_x, taro_y, taro_alive, t_energies, t_visions, t_fangs, t_sizes, t_aggros, t_intels, t_fears, t_angles, meat_x, meat_y, meat_active, m_counts, m_idx, t_counts, t_idx, t_true_stomach_acidities, t_forestomach_capas, t_intestine_lens, t_microbiome, grass_grids, t_speeds, t_current_speeds, river_grids, t_keratins, t_nerve_densities)
         
-        engine.update_movement_and_stamina(taro_x, taro_y, taro_alive, t_angles, t_speeds, t_current_speeds, t_sizes, t_staminas, t_max_staminas, t_lung_capas, t_muscle_ratio, t_energies, river_grids, t_fat_ratios, t_keratins, t_keratin_types, t_keratin_complexities, altitude_grids, global_temperature,t_intestine_lens)
+        engine.update_movement_and_stamina(taro_x, taro_y, taro_alive, t_angles, t_speeds, t_current_speeds, t_sizes, t_staminas, t_max_staminas, t_lung_capas, t_muscle_ratio, t_energies, river_grids, t_fat_ratios, t_keratins, t_keratin_types, t_keratin_complexities, temperature_grids,t_intestine_lens)
         
         engine.process_interactions(taro_x, taro_y, taro_alive, t_energies, t_fangs, t_sizes, t_true_stomach_acidities, t_forestomach_capas, t_intestine_lens, t_cecum_sizes, t_speeds, t_visions, t_aggros, t_intels, t_fears, meat_x, meat_y, meat_amount, meat_active, m_counts, m_idx, t_counts, t_idx, t_ages, t_microbiome, grass_grids, death_stats, t_max_staminas, t_lung_capas, t_muscle_ratio, t_staminas, meat_age, t_cooldowns, t_metabolisms, t_fat_ratios, t_keratins, t_keratin_types, t_keratin_complexities, t_nerve_densities)
 
