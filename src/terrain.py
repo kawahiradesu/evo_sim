@@ -361,7 +361,7 @@ def generate_moisture(altitude_grids, river_grids):
     # 水分の拡散は物理的には距離に応じて減衰する。
     # 正確には指数減衰 e^(-d) が近いが、計算が簡単で
     # 見た目も自然な 1/(1+d²) を採用している。
-    SPREAD_RANGE = 5  # 川の影響範囲（5セル ≈ ワールド座標で10単位）
+    SPREAD_RANGE = 10  # 川の影響範囲（5セル ≈ ワールド座標で10単位）
     
     for r in range(rows):
         for c in range(cols):
@@ -377,7 +377,7 @@ def generate_moisture(altitude_grids, river_grids):
                             dist = np.sqrt(dr * dr + dc * dc)
                             if dist > 0:
                                 # 逆二乗法則: 近い→強い、遠い→弱い
-                                spread = river_grids[r, c] / (1.0 + dist * dist * 0.5)
+                                spread = river_grids[r, c] / (1.0 + dist * 0.3) 
                                 # max: 既に高い水分は上書きしない
                                 moisture[nr, nc] = max(moisture[nr, nc], spread)
     

@@ -13,50 +13,134 @@ from calc import *
 # 🌿 1. 環境システム（植物とグリッド）
 # ------------------------------------------
 @njit
-def process_plants(tree_grids, grass_grids, moisture_grids, temperature_grids, global_sunlight):
-    """植物の成長（光獲得競争と季節変動）"""
-    for r in range(GRID_SIZE):
-        for c in range(GRID_SIZE):
-            m = moisture_grids[r, c]
-            
-            # 🌡️ 局所気温: 標高が高いほど寒い（0.0〜1.0の高度で最大-20度のペナルティ）
-            local_temp = temperature_grids[r, c]
-            
-            # 気温が氷点下（0度以下）になると成長停止・枯死が始まる
-            temp_factor = max(0.0, min(1.0, local_temp / 15.0))
-            # 日照量が少ない（冬）と成長速度が落ちる
-            sun_factor = global_sunlight
-            
-            # 総合的な成長力（水分 × 気温 × 日照量）
-            growth_power = m * temp_factor * sun_factor
-            
-            # 🌳 木の成長（成長は遅いが、水分と温度があれば育つ）
-            tree_cap = 1000.0 * m
-            if tree_grids[r, c] < tree_cap:
-                tree_grids[r, c] += 1.0 * growth_power
-            
-            # 寒すぎると木も少しずつ枯れる（冬枯れ）
-            if local_temp < 0.0:
-                tree_grids[r, c] += local_temp * 0.1
-                if tree_grids[r, c] < 0.0: tree_grids[r, c] = 0.0
-                
-            # 🌿 草の成長（成長は速いが、木に光を遮られると枯れる）
-            grass_cap = 1000.0 * m
-            
-            # 【樹冠ペナルティ】木が300を超えると日陰になり始め、600で草は完全に育たなくなる
-            shade_penalty = max(0.0, min(1.0, (tree_grids[r, c] - 300.0) / 300.0))
-            
-            if grass_grids[r, c] < grass_cap * (1.0 - shade_penalty):
-                grass_grids[r, c] += 4.0 * growth_power * (1.0 - shade_penalty)
-            else:
-                grass_grids[r, c] -= 2.0 # 日陰になると枯れていく
-                
-            # 寒すぎると草は一気に枯れる
-            if local_temp < 5.0:
-                grass_grids[r, c] -= (5.0 - local_temp) * 0.5
-                
+def process_plants(plant_slot_types, plant_slot_amounts, tree_grids, grass_grids, moisture_grids, temperature_grids, global_sunlight):
+    """植物の成長（スロット制）"""
 
-            if grass_grids[r, c] < 0.0: grass_grids[r, c] = 0.0
+    # 植物種の定義
+    # (最大量, 成長率, 毒性, 好む水分下限, 好む気温下限, 枯れ始める気温)
+    # ID: 0=石松類, 1=シダ類, 2=鱗木, 3=封印木
+    MAX_AMOUNTS  = (500.0,  400.0,  2000.0, 1200.0)
+    GROWTH_RATES = (0.8,    0.6,    0.2,    0.3)
+    SPREAD_RATES = (0.3,    0.2,    0.05,   0.08)
+    MIN_MOISTURE = (0.3,    0.5,    0.6,    0.4)
+    MIN_TEMP     = (5.0,    8.0,    10.0,   5.0)
+    WILT_TEMP    = (5.0,    5.0,    0.0,    0.0)   # この気温以下で枯れ始める
+    IS_TREE      = (False,  False,  True,   True)
+
+    rows = plant_slot_types.shape[0]
+    cols = plant_slot_types.shape[1]
+    slots = plant_slot_types.shape[2]
+
+    for r in range(rows):
+        for c in range(cols):
+            m = moisture_grids[r, c]
+            local_temp = temperature_grids[r, c]
+            temp_factor = max(0.0, min(1.0, local_temp / 15.0))
+            growth_power = m * temp_factor * global_sunlight
+
+            # 樹冠ペナルティの計算（木系スロットの合計量から）
+            tree_total = 0.0
+            for s in range(slots):
+                pid = plant_slot_types[r, c, s]
+                if pid == 2 or pid == 3:
+                    tree_total += plant_slot_amounts[r, c, s]
+            shade_penalty = max(0.0, min(1.0, (tree_total - 300.0) / 300.0))
+
+            # 各スロットの成長・枯死
+            for s in range(slots):
+                pid = plant_slot_types[r, c, s]
+                if pid < 0:
+                    continue
+
+                amount = plant_slot_amounts[r, c, s]
+                max_amount = MAX_AMOUNTS[pid]
+                growth_rate = GROWTH_RATES[pid]
+                wilt_temp = WILT_TEMP[pid]
+                is_tree = IS_TREE[pid]
+
+                # 水分不足なら成長しない
+                if m < MIN_MOISTURE[pid]:
+                    amount -= 1.0
+                else:
+                    # 草系は樹冠ペナルティを受ける
+                    if not is_tree:
+                        effective_cap = max_amount * (1.0 - shade_penalty)
+                        if amount < effective_cap:
+                            amount += growth_rate * growth_power * (1.0 - shade_penalty)
+                        else:
+                            amount -= 2.0
+                    else:
+                        if amount < max_amount:
+                            amount += growth_rate * growth_power
+
+                # 寒さで枯れる
+                if local_temp < wilt_temp:
+                    amount -= (wilt_temp - local_temp) * 0.5
+
+                amount = max(0.0, amount)
+                plant_slot_amounts[r, c, s] = amount
+
+                # 量がゼロになったらスロットを空ける
+                if amount <= 0.0:
+                    plant_slot_types[r, c, s] = -1
+
+            # 侵入処理（隣接グリッドから植物が広がる）
+            for s in range(slots):
+                pid = plant_slot_types[r, c, s]
+                if pid < 0:
+                    continue
+                if plant_slot_amounts[r, c, s] < 50.0:
+                    continue  # 量が少ないと侵入できない
+                    
+                if np.random.random() < SPREAD_RATES[pid]:
+                    # 隣接4方向をランダムに選ぶ
+                    dr = 0; dc = 0
+                    rnd = np.random.random()
+                    if   rnd < 0.25: dr = -1
+                    elif rnd < 0.50: dr =  1
+                    elif rnd < 0.75: dc = -1
+                    else:            dc =  1
+                    
+                    nr = r + dr
+                    nc = c + dc
+                    
+                    # 範囲外チェック
+                    if nr < 0 or nr >= rows or nc < 0 or nc >= cols:
+                        continue
+                    
+                    # 隣接グリッドの環境条件チェック
+                    nm = moisture_grids[nr, nc]
+                    nt = temperature_grids[nr, nc]
+                    if nm < MIN_MOISTURE[pid] or nt < MIN_TEMP[pid]:
+                        continue
+                    
+                    # 同じ植物種がすでにいるか確認
+                    already_exists = False
+                    empty_slot = -1
+                    for s2 in range(slots):
+                        if plant_slot_types[nr, nc, s2] == pid:
+                            already_exists = True
+                            break
+                        if plant_slot_types[nr, nc, s2] < 0 and empty_slot < 0:
+                            empty_slot = s2
+                    
+                    # 同種がいなくて空きスロットがあれば侵入
+                    if not already_exists and empty_slot >= 0:
+                        plant_slot_types[nr, nc, empty_slot]   = pid
+                        plant_slot_amounts[nr, nc, empty_slot] = 10.0
+
+            # grass_grids と tree_grids を再計算（既存関数との並行運用）
+            grass_total = 0.0
+            tree_total2 = 0.0
+            for s in range(slots):
+                pid = plant_slot_types[r, c, s]
+                if pid == 0 or pid == 1:
+                    grass_total += plant_slot_amounts[r, c, s]
+                elif pid == 2 or pid == 3:
+                    tree_total2 += plant_slot_amounts[r, c, s]
+            grass_grids[r, c] = grass_total
+            tree_grids[r, c]  = tree_total2
+
 @njit
 def update_temperature_grids(temperature_grids, altitude_grids, sun_angle):
     rows = temperature_grids.shape[0]

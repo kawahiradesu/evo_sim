@@ -90,6 +90,9 @@ buffer_plants = np.zeros(GRID_SIZE * GRID_SIZE * 2, dtype=np.float32) # 🌟 NEW
 buffer_meat = np.zeros(MAX_MEAT * 2, dtype=np.float32)
 death_stats = np.zeros(4, dtype=np.int64)
 
+# shape: (GRID_SIZE, GRID_SIZE, MAX_PLANT_SLOTS)
+plant_slot_types   = np.full((GRID_SIZE, GRID_SIZE, MAX_PLANT_SLOTS), -1, dtype=np.int32)
+plant_slot_amounts = np.zeros((GRID_SIZE, GRID_SIZE, MAX_PLANT_SLOTS), dtype=np.float32)
 
 def save_evolution_graph(taro_alive, t_fangs, t_intestine_lens, frame_count):
     alive_idx = np.where(taro_alive)[0]
@@ -223,7 +226,14 @@ def run_simulation():
     initial_shade = np.maximum(0.0, np.minimum(1.0, (tree_grids - 300.0) / 300.0))
     grass_grids[:] = np.random.uniform(200.0, 500.0, (GRID_SIZE, GRID_SIZE)) * moisture_grids * (1.0 - initial_shade)
     grass_grids[:] = np.maximum(0.0, grass_grids)
-    
+    for r in range(GRID_SIZE):
+        for c in range(GRID_SIZE):
+            if grass_grids[r, c] > 0:
+                plant_slot_types[r, c, 0]   = 0    # 石松類
+                plant_slot_amounts[r, c, 0] = grass_grids[r, c]
+            if tree_grids[r, c] > 0:
+                plant_slot_types[r, c, 1]   = 2    # 鱗木
+                plant_slot_amounts[r, c, 1] = tree_grids[r, c]
     # 虫の初期分布：草に依存して自動計算
     bug_grids[:] = (grass_grids * 1.5) - (tree_grids * 0.8)
     bug_grids[:] = np.maximum(0.0, bug_grids)
@@ -328,7 +338,7 @@ def run_simulation():
         # 🌟 NEW: 植物の成長処理（気温と日照に依存）
         engine.update_temperature_grids(temperature_grids, altitude_grids, sun_angle)
 
-        engine.process_plants(tree_grids, grass_grids, moisture_grids, temperature_grids, global_sunlight)
+        engine.process_plants(plant_slot_types, plant_slot_amounts, tree_grids, grass_grids, moisture_grids, temperature_grids, global_sunlight)
 
         engine.build_grids(meat_x, meat_y, meat_active, taro_x, taro_y, taro_alive, m_counts, m_idx, t_counts, t_idx)
         
