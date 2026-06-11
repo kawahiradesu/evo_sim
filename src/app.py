@@ -328,7 +328,7 @@ def run_simulation():
         # 🌟 NEW: 植物の成長処理（気温と日照に依存）
         engine.update_temperature_grids(temperature_grids, altitude_grids, sun_angle)
 
-        engine.process_plants(tree_grids, grass_grids, moisture_grids, temperature_grids, global_sunlight, altitude_grids)
+        engine.process_plants(tree_grids, grass_grids, moisture_grids, temperature_grids, global_sunlight)
 
         engine.build_grids(meat_x, meat_y, meat_active, taro_x, taro_y, taro_alive, m_counts, m_idx, t_counts, t_idx)
         

@@ -13,12 +13,11 @@ from calc import *
 # 🌿 1. 環境システム（植物とグリッド）
 # ------------------------------------------
 @njit
-def process_plants(tree_grids, grass_grids, moisture_grids, temperature_grids, global_sunlight,altitude_grids):
+def process_plants(tree_grids, grass_grids, moisture_grids, temperature_grids, global_sunlight):
     """植物の成長（光獲得競争と季節変動）"""
     for r in range(GRID_SIZE):
         for c in range(GRID_SIZE):
             m = moisture_grids[r, c]
-            alt = altitude_grids[r, c]
             
             # 🌡️ 局所気温: 標高が高いほど寒い（0.0〜1.0の高度で最大-20度のペナルティ）
             local_temp = temperature_grids[r, c]
