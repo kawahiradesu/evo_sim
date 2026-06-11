@@ -326,7 +326,7 @@ def run_simulation():
         # エンジン処理
         # ====================================================
         # 🌟 NEW: 植物の成長処理（気温と日照に依存）
-        engine.update_temperature_grids(temperature_grids, altitude_grids, global_temperature)
+        engine.update_temperature_grids(temperature_grids, altitude_grids, sun_angle)
 
         engine.process_plants(tree_grids, grass_grids, moisture_grids, temperature_grids, global_sunlight, altitude_grids)
 

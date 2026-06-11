@@ -59,19 +59,17 @@ def process_plants(tree_grids, grass_grids, moisture_grids, temperature_grids, g
 
             if grass_grids[r, c] < 0.0: grass_grids[r, c] = 0.0
 @njit
-def update_temperature_grids(temperature_grids, altitude_grids, global_temperature):
+def update_temperature_grids(temperature_grids, altitude_grids, sun_angle):
     rows = temperature_grids.shape[0]
     cols = temperature_grids.shape[1]
     for r in range(rows):
         for c in range(cols):
-            # 緯度補正：中央（赤道）が最も暖かく、端（極）に向かって冷える
-            latitude_factor = abs(r - rows / 2.0) / (rows / 2.0)  # 0.0（赤道）〜1.0（極）
-            latitude_temp   = latitude_factor * 20.0               # 極は赤道より最大20℃低い
-
-            # 高度補正
+            latitude_factor = abs(r - rows / 2.0) / (rows / 2.0)
+            # 季節変動幅：赤道はほぼゼロ、極は最大TEMP_SEASON_AMP
+            season_amp  = TEMP_SEASON_AMP * latitude_factor
+            latitude_temp = latitude_factor * TEMP_LATITUDE_AMP
             altitude_temp = altitude_grids[r, c] * TEMP_ALTITUDE_FACTOR
-
-            temperature_grids[r, c] = global_temperature - latitude_temp - altitude_temp
+            temperature_grids[r, c] = TEMP_BASE - latitude_temp - altitude_temp + sun_angle * season_amp
 
 @njit
 def build_grids(meat_x, meat_y, meat_active, taro_x, taro_y, taro_alive, m_counts, m_idx, t_counts, t_idx):
