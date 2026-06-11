@@ -26,6 +26,8 @@ def process_plants(plant_slot_types, plant_slot_amounts, tree_grids, grass_grids
     MIN_TEMP     = (5.0,    8.0,    10.0,   5.0)
     WILT_TEMP    = (5.0,    5.0,    0.0,    0.0)   # この気温以下で枯れ始める
     IS_TREE      = (False,  False,  True,   True)
+    SHADE_RESIST  = (0.0,    0.3,    1.0,    0.8)   # 日陰耐性（1.0=完全耐性、木は自分の日陰に強い）
+    ROOT_DEPTH    = (0.0,    0.1,    0.3,    0.2)   # 根の深さ（MIN_MOISTUREをこの分だけ緩和）
 
     rows = plant_slot_types.shape[0]
     cols = plant_slot_types.shape[1]
@@ -58,15 +60,16 @@ def process_plants(plant_slot_types, plant_slot_amounts, tree_grids, grass_grids
                 wilt_temp = WILT_TEMP[pid]
                 is_tree = IS_TREE[pid]
 
-                # 水分不足なら成長しない
-                if m < MIN_MOISTURE[pid]:
+                effective_min_moisture = max(0.0, MIN_MOISTURE[pid] - ROOT_DEPTH[pid])
+                if m < effective_min_moisture:
                     amount -= 1.0
                 else:
                     # 草系は樹冠ペナルティを受ける
                     if not is_tree:
-                        effective_cap = max_amount * (1.0 - shade_penalty)
+                        shade_effect  = max(0.0, shade_penalty - SHADE_RESIST[pid])  # 耐性で相殺
+                        effective_cap = max_amount * (1.0 - shade_effect)
                         if amount < effective_cap:
-                            amount += growth_rate * growth_power * (1.0 - shade_penalty)
+                            amount += growth_rate * growth_power * (1.0 - shade_effect)
                         else:
                             amount -= 2.0
                     else:
@@ -113,7 +116,14 @@ def process_plants(plant_slot_types, plant_slot_amounts, tree_grids, grass_grids
                     nt = temperature_grids[nr, nc]
                     if nm < MIN_MOISTURE[pid] or nt < MIN_TEMP[pid]:
                         continue
-                    
+                    if IS_TREE[pid]:
+                        grass_resistance = 0.0
+                        for s2 in range(slots):
+                            npid = plant_slot_types[nr, nc, s2]
+                            if npid == 0 or npid == 1:
+                                grass_resistance += plant_slot_amounts[nr, nc, s2] / 500.0
+                        if np.random.random() < grass_resistance * 0.5:
+                            continue  # 草原に阻まれて侵入失敗
                     # 同じ植物種がすでにいるか確認
                     already_exists = False
                     empty_slot = -1
